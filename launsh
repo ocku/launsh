@@ -1,0 +1,77 @@
+#!/bin/sh
+
+cache_dir="${HOME}/.cache/launsh"
+cache_file="${cache_dir}/cache"
+
+run() {
+	# run {cmd} -> void
+
+	swaymsg exec -- "$1"
+}
+
+is_path_cached() (
+
+	# is_path_cached -> 'true' | 'false'
+	# indicates whether our executable cache is up to date
+
+	# if there is no cache file, then PATH is not cached, exit.
+	[ -e "$cache_file" ] || {
+		printf false
+		exit
+	}
+
+	# if there is a cache file, get its epoch
+	cache_file_epoch="$(stat -c'%Z' "$cache_file")"
+
+	(
+		# split the path by ":" and separate each of its components
+		# into a different line with printf + expansion
+		IFS=':'
+		# shellcheck disable=2086
+		printf "%s\n" $PATH
+	) | while read -r dir; do
+		# read each directory and compare epochs with our cache file's
+		[ "$(stat -c'%Z' "$dir")" -gt "$cache_file_epoch" ] && {
+			# if a directory's epoch is newer, then we need to revalidate
+			printf false
+			exit
+		}
+	done
+
+	printf true
+)
+
+get_cmd() {
+
+	# get_cmd -> '{command}' | void
+	# obtain the command list and get the user's pick
+
+	if [ "$(is_path_cached)" = "true" ]; then
+		# take user input
+		fzf <"$cache_file"
+	else
+		(
+			# split the path by ":" and separate each of its components
+			# into a different line with printf + expansion
+			IFS=':'
+			# shellcheck disable=2086
+			printf "%s\n" $PATH
+		) |
+			# find all the executable files in each directory
+			xargs -I{} find '{}' -maxdepth 1 -type f -executable |
+			# remove the base directory and leave only the file names
+			awk -F/ '{print $NF}' 2>/dev/null |
+			# make sure we only get unique results
+			sort |
+			uniq -u |
+			# save results to our cache file and pipe them to fzf
+			tee "$cache_file" |
+			fzf # take user input
+	fi
+}
+
+[ -e "$cache_dir" ] || mkdir -p "$cache_dir"
+
+cmd="$(get_cmd)"
+
+[ -n "$cmd" ] && run "$cmd"
