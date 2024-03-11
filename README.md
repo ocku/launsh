@@ -1,6 +1,6 @@
 # Launsh
 
-A minimal, terminal-based alternative to dmenu_path + {dmenu, rofi, wmenu, ...etc}, straight from my dotfiles :).
+A minimal, terminal-based alternative to dmenu_path + {dmenu, rofi, wmenu, ...etc}.
 
 ![image](https://github.com/ocku/launsh/assets/147977941/cce9e393-a03b-495c-a83b-eacf94822e63)
 
@@ -20,7 +20,7 @@ install launsh ~/.local/bin/
 
 ### Using Sway + Alacritty
 
-If you're using Sway and Alacritty, add these three lines to your sway config.
+If you're using Sway and Alacritty, add the following to your Sway config. 
 
 `.config/sway/config`
 ```sway
@@ -42,5 +42,5 @@ for_window [app_id="launsh"] floating enable
 
 ### Using anything else
 
-If you're not using sway, make sure to change the command inside the `run` function at the start of `launsh`, which is configured to use `swaymsg exec` by default.
+If you're not using Sway, make sure to change the `run` function at the start of `launsh`, which is set to use `swaymsg exec` by default.
 
