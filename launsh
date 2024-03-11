@@ -1,77 +1,92 @@
 #!/bin/sh
 
-cache_dir="${HOME}/.cache/launsh"
-cache_file="${cache_dir}/cache"
+set -eu
+
+# constants #########################################################
+
+home_dir="${XDG_CONFIG_HOME:-"$HOME"}"
+
+[ -z "$home_dir" ] && {
+	printf '%s\n' \
+		'Launsh needs HOME or XDG_CONFIG_HOME to be set!' >&2
+	exit 1
+}
+
+cache_dir="$home_dir/.cache/launsh"
+cache_file="$cache_dir/cache"
+
+# utils #############################################################
 
 run() {
-	# run {cmd} -> void
+	# run '{cmd}'
+	# run a command using our exec function
 
 	swaymsg exec -- "$1"
 }
 
-is_path_cached() (
+is_cache_valid() (
+	# is_cache_valid
+	# indicates whether our cache contains the newest information
 
-	# is_path_cached -> 'true' | 'false'
-	# indicates whether our executable cache is up to date
+	[ -e "$cache_file" ] ||
+		return 1
 
-	# if there is no cache file, then PATH is not cached, exit.
-	[ -e "$cache_file" ] || {
-		printf false
-		exit
-	}
-
-	# if there is a cache file, get its epoch
+	# get the unix epoch of the cache file
 	cache_file_epoch="$(stat -c'%Z' "$cache_file")"
 
 	(
-		# split the path by ":" and separate each of its components
-		# into a different line with printf + expansion
+		# split the path by ":" and expand it into new lines
 		IFS=':'
 		# shellcheck disable=2086
 		printf "%s\n" $PATH
-	) | while read -r dir; do
-		# read each directory and compare epochs with our cache file's
-		[ "$(stat -c'%Z' "$dir")" -gt "$cache_file_epoch" ] && {
-			# if a directory's epoch is newer, then we need to revalidate
-			printf false
-			exit
-		}
-	done
-
-	printf true
+	) |
+		# read each directory and compare epochs with our cache_file's
+		while read -r dir; do
+			[ "$(stat -c'%Z' "$dir")" -gt "$cache_file_epoch" ] &&
+				# if a directory's epoch is newer, invalidate
+				return 1
+		done
 )
 
-get_cmd() {
+get_path_files() {
+	# get_path_files
+	# obtain the executable files to be listed, separated by new lines
 
-	# get_cmd -> '{command}' | void
-	# obtain the command list and get the user's pick
+	is_cache_valid && {
+		cat "$cache_file"
+		return 0
+	}
 
-	if [ "$(is_path_cached)" = "true" ]; then
-		# take user input
-		fzf <"$cache_file"
-	else
-		(
-			# split the path by ":" and separate each of its components
-			# into a different line with printf + expansion
-			IFS=':'
-			# shellcheck disable=2086
-			printf "%s\n" $PATH
-		) |
-			# find all the executable files in each directory
-			xargs -I{} find '{}' -maxdepth 1 -type f -executable |
-			# remove the base directory and leave only the file names
-			awk -F/ '{print $NF}' 2>/dev/null |
-			# make sure we only get unique results
-			sort |
-			uniq -u |
-			# save results to our cache file and pipe them to fzf
-			tee "$cache_file" |
-			fzf # take user input
-	fi
+	(
+		# split the path by ":" and expand it into new lines
+		IFS=':'
+		# shellcheck disable=2086
+		printf "%s\n" $PATH
+	) |
+		# find all the executable files in each directory
+		xargs -I{} find '{}' -maxdepth 1 -type f -executable |
+		# remove the base directory and leave only the file names
+		awk -F/ '{print $NF}' 2>/dev/null |
+		# make sure we don't get duplicates
+		sort |
+		uniq -u |
+		# save results to our cache_file and print them
+		tee "$cache_file"
 }
 
-[ -e "$cache_dir" ] || mkdir -p "$cache_dir"
+# main ##############################################################
 
-cmd="$(get_cmd)"
+{
+	[ -e "$cache_dir" ] || mkdir -p "$cache_dir"
 
-[ -n "$cmd" ] && run "$cmd"
+	cmd="$(
+		get_path_files |
+			fzf \
+				--preview 'which {}' \
+				--layout reverse \
+				--border none \
+				--no-scrollbar
+	)"
+
+	[ -n "$cmd" ] && run "$cmd"
+}
