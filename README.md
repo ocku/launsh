@@ -2,7 +2,7 @@
 
 A minimal, terminal-based alternative to dmenu_path + {dmenu, rofi, wmenu, ...etc}.
 
-![image](https://github.com/ocku/launsh/assets/147977941/cce9e393-a03b-495c-a83b-eacf94822e63)
+![image](https://github.com/ocku/launsh/assets/147977941/4b68798e-21c4-4ca0-bb77-3213914ffdcd)
 
 ## Dependencies
 
